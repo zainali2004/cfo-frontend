@@ -266,7 +266,10 @@ def _render_data_preview(result: dict) -> None:
             # Email body preview
             body_text = result.get("extracted_text", "")
             with st.expander("Email Body Preview", expanded=False):
-                st.text(body_text[:2000] + ("..." if len(body_text) > 2000 else ""))
+                preview = body_text[:2000] + ("..." if len(body_text) > 2000 else "")
+                # Use a code block so whitespace/newlines are preserved without
+                # needing unsafe_allow_html — clean text arrives from the backend.
+                st.markdown(f"```\n{preview}\n```")
 
             # Attachment previews — one entry per attachment
             if atts:
