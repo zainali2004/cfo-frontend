@@ -1,0 +1,5 @@
+# FrontEnd dependencies
+streamlit
+requests
+pandas
+urllib3
