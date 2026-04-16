@@ -35,6 +35,8 @@ import base64
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+import re
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -75,7 +77,8 @@ st.markdown(
 # Future improvement: extract to FrontEnd/api_client.py once a third page
 # is added, eliminating the duplication.
 # ---------------------------------------------------------------------------
-API_BASE: str = "https://cfo-backend-de7r.onrender.com"
+API_BASE: str = "https://cfo-backend-de7r.onrender.com" # DEPLOYED PRODUCTION URL
+# API_BASE: str = "http://localhost:8000"                 # LOCAL DEVELOPMENT URL
 
 # REQUESTS_VERIFY = False:
 # Disables SSL certificate verification for loopback calls.
@@ -864,6 +867,31 @@ with tab2:
 
 
 # ============================================================
+# PHASE 2.6 — Helper: Markdown / LaTeX Message Renderer
+# ============================================================
+
+def _render_chat_message(content: str) -> None:
+    """
+    Render a chat message with correct Markdown AND LaTeX math support.
+
+    Streamlit's st.markdown() supports KaTeX math but ONLY with the
+    dollar-sign delimiters ($...$ and $$...$$).  GPT frequently returns
+    LaTeX using bracket notation:
+      \\[ ... \\]   — display (block) math
+      \\( ... \\)   — inline math
+
+    This helper converts those notations to dollar-sign delimiters before
+    passing the content to st.markdown(), so all formulas, fractions,
+    Greek letters etc. render correctly rather than appearing as raw text.
+    """
+    # Convert display math: \[ ... \] → $$ ... $$
+    content = re.sub(r'\\\[(.+?)\\\]', r'$$\1$$', content, flags=re.DOTALL)
+    # Convert inline math: \( ... \) → $ ... $
+    content = re.sub(r'\\\((.+?)\\\)', r'$\1$', content, flags=re.DOTALL)
+    st.markdown(content)
+
+
+# ============================================================
 # PHASE 2.6 — Helper: Chat Message Processor
 # ============================================================
 
@@ -916,7 +944,7 @@ def _process_chat(user_input: str, context: dict) -> None:
                 "Please check that the backend is running and try again."
             )
 
-        st.markdown(reply)
+        _render_chat_message(reply)
 
     # ── Save both turns to history ─────────────────────────────────────────
     # Saved AFTER rendering so that the current run shows the bubbles
@@ -1011,7 +1039,7 @@ with tab3:
             # Each entry is {"role": "user"|"assistant", "content": str}
             for msg in st.session_state["chat_history"]:
                 with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
+                    _render_chat_message(msg["content"])
 
             # 2. Suggested questions (shown only on first open, before any chat)
             # Generic questions valid for any financial document.
