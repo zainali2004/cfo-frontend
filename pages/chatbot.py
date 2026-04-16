@@ -78,7 +78,7 @@ st.markdown(
 # is added, eliminating the duplication.
 # ---------------------------------------------------------------------------
 API_BASE: str = "https://cfo-backend-de7r.onrender.com" # DEPLOYED PRODUCTION URL
-# API_BASE: str = "http://localhost:8000"                 # LOCAL DEVELOPMENT URL
+#API_BASE: str = "http://localhost:8000"                 # LOCAL DEVELOPMENT URL
 
 # REQUESTS_VERIFY = False:
 # Disables SSL certificate verification for loopback calls.
@@ -782,12 +782,13 @@ def _render_visuals(
             "extracted_text": upload_result.get("extracted_text"),
             "insights_json":  insights,
             "domain_info":    domain_info,
-            # Agent 3 KPIs — same as the /visuals call so charts are identical
             "kpis":           st.session_state.get("concepts", []),
-            # Pass data fields so export uses the same chart generation route
             "df_records":     upload_result.get("records"),
             "df_columns":     upload_result.get("columns"),
             "dfs_records":    upload_result.get("dfs_records"),
+            # Pass the already-rendered images so the backend uses the EXACT
+            # same charts shown on screen — no LLM re-generation, no color drift.
+            "pre_rendered_visuals": visuals,
         }
         with st.spinner("Building PowerPoint presentation..."):
             resp = requests.post(
