@@ -77,8 +77,8 @@ st.markdown(
 # Future improvement: extract to FrontEnd/api_client.py once a third page
 # is added, eliminating the duplication.
 # ---------------------------------------------------------------------------
-API_BASE: str = "https://cfo-backend-de7r.onrender.com" # DEPLOYED PRODUCTION URL
-#API_BASE: str = "http://localhost:8000"                 # LOCAL DEVELOPMENT URL
+#API_BASE: str = "https://cfo-backend-de7r.onrender.com" # DEPLOYED PRODUCTION URL
+API_BASE: str = "http://localhost:8000"                 # LOCAL DEVELOPMENT URL
 
 # REQUESTS_VERIFY = False:
 # Disables SSL certificate verification for loopback calls.
