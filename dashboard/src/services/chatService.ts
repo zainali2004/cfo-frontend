@@ -38,6 +38,7 @@ export interface ChatResponse {
     reply: string
     attachments?: ChatAttachment[]
     web_search_used?: boolean
+    web_search_source?: 'web' | 'model_training' | 'none'
 }
 
 // ── API Functions ──────────────────────────────────────

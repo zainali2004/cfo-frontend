@@ -3,6 +3,8 @@ import { Send, Loader2, AlertCircle, Download, File, FileText, Sheet, Image as I
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useDatasetStore } from '@/stores/useDatasetStore'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { sendChatMessage, type ChatMessage, type ChatContext, type ChatAttachment } from '@/services/chatService'
 
 // ── Attachment rendering ────────────────────────────────────────
@@ -95,7 +97,7 @@ export function ChatPage() {
     const chatContextReady = Boolean(uploadPayload && profiles.length > 0 && domainInfo && kpiConcepts.length > 0 && insights && agent5Done)
 
     const [isLoading, setIsLoading] = useState(false)
-    const [webSearchUsedMap, setWebSearchUsedMap] = useState<Record<number, boolean>>({})
+    const [webSearchSourceMap, setWebSearchSourceMap] = useState<Record<number, 'web' | 'model_training'>>({})
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Auto-scroll to bottom when messages update
@@ -185,15 +187,15 @@ export function ChatPage() {
 
             const newMsgIndex = updatedMessages.length - 1
 
-            // Track whether this message used web search
-            if (response.web_search_used) {
-                setWebSearchUsedMap((prev) => ({ ...prev, [newMsgIndex]: true }))
+            // Track the source of this message (web search or model training)
+            if (response.web_search_source === 'web' || response.web_search_source === 'model_training') {
+                setWebSearchSourceMap((prev) => ({ ...prev, [newMsgIndex]: response.web_search_source as 'web' | 'model_training' }))
             }
 
             // Store attachments for this message index
             if (response.attachments && response.attachments.length > 0) {
                 setChatAttachments({
-                    ...chatAttachments,
+                    ...useDatasetStore.getState().chatAttachments,
                     [newMsgIndex]: response.attachments,
                 })
             }
@@ -244,24 +246,53 @@ export function ChatPage() {
                             <div key={idx}>
                                 <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div
-                                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                        className={`max-w-xs lg:max-w-2xl px-4 py-2 rounded-lg ${
                                             msg.role === 'user'
                                                 ? 'bg-deloitte text-white rounded-br-none'
                                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none'
                                         }`}
                                     >
-                                        <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                                        {msg.role === 'user' ? (
+                                            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                                        ) : (
+                                            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                                                        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                                                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                                                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                                        em: ({ children }) => <em className="italic">{children}</em>,
+                                                        h1: ({ children }) => <h1 className="text-base font-bold mb-1 mt-2">{children}</h1>,
+                                                        h2: ({ children }) => <h2 className="text-sm font-bold mb-1 mt-2">{children}</h2>,
+                                                        h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-1">{children}</h3>,
+                                                        a: ({ href, children }) => (
+                                                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-deloitte underline hover:opacity-80 break-all">
+                                                                {children}
+                                                            </a>
+                                                        ),
+                                                        code: ({ children }) => <code className="bg-gray-200 dark:bg-gray-600 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+                                                        hr: () => <hr className="my-2 border-gray-300 dark:border-gray-500" />,
+                                                    }}
+                                                >
+                                                    {msg.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                {/* Web search badge */}
-                                {msg.role === 'assistant' && webSearchUsedMap[idx] && (
+                                {/* Source attribution badge */}
+                                {msg.role === 'assistant' && webSearchSourceMap[idx] === 'web' && (
                                     <div className="flex justify-start mt-1.5 pl-1">
                                         <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-2.5 py-1 text-xs text-blue-600 dark:text-blue-400">
                                             <Globe className="h-3 w-3 flex-shrink-0" />
-                                            <span>Via web search · results may be inaccurate</span>
+                                            <span>Via live web search · accuracy &amp; date may vary</span>
                                         </div>
                                     </div>
                                 )}
+
 
                                 {/* Show attachments for assistant messages */}
                                 {msg.role === 'assistant' && chatAttachments[idx] && chatAttachments[idx].length > 0 && (
@@ -296,7 +327,7 @@ export function ChatPage() {
                         onKeyDown={handleKeyDown}
                         placeholder="Ask a question... (Shift+Enter for new line)"
                         disabled={isLoading}
-                        className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-deloitte/40 focus:border-deloitte transition-colors disabled:opacity-50"
+                        className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-deloitte/40 focus:border-deloitte transition-colors disabled:opacity-50 [color-scheme:light] dark:[color-scheme:dark]"
                         rows={3}
                     />
                     <Button
