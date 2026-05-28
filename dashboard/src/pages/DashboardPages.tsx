@@ -64,12 +64,15 @@ export function UploadPage() {
                 agent1Done: true,
             })
             toast.success("Data uploaded successfully")
-        } catch (error) {
-            toast.error("Upload failed. Please try again.")
+        } catch (error: unknown) {
+            const detail =
+                (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+            toast.error(detail ?? "Upload failed. Please try again.")
             console.error(error)
         } finally {
             setIsUploading(false)
         }
+
     }
 
     const handleSectorChange = (value: string) => {

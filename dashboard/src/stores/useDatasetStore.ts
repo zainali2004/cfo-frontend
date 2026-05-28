@@ -517,8 +517,13 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
         set({ isLoadingCharts: true, chartsError: null })
 
         try {
-            const chartData = await getVisualizationData(datasetId || "mock-dataset-123")
-            set({ charts: chartData, isLoadingCharts: false })
+            const chartData = await getVisualizationData(datasetId || '')
+            if (chartData) {
+                set({ charts: chartData, isLoadingCharts: false })
+            } else {
+                // Backend charts endpoint not yet available
+                set({ isLoadingCharts: false, charts: null })
+            }
         } catch (error) {
             console.error("Failed to load chart data:", error)
             set({
@@ -527,6 +532,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
             })
         }
     },
+
 
     runExport: async (format: ExportFormat) => {
         const payload = get().uploadPayload

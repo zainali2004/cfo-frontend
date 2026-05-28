@@ -169,17 +169,12 @@ function mapUploadResponseToDataset(resp: UploadApiResponse): DatasetResponse {
  * REAL: Replace body with `return api.post('/upload', formData).then(res => res.data)`
  */
 export async function uploadFile(formData: FormData): Promise<DatasetResponse> {
-    try {
-        const { data } = await api.post<UploadApiResponse>('/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        return mapUploadResponseToDataset(data)
-    } catch (error) {
-        console.warn('Upload API unavailable, using mock dataset.', error)
-        await new Promise((resolve) => setTimeout(resolve, 700))
-        return MOCK_DATASET
-    }
+    const { data } = await api.post<UploadApiResponse>('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return mapUploadResponseToDataset(data)
 }
+
 
 export interface ProfileResult {
     profiles: Record<string, unknown>[]
@@ -466,16 +461,16 @@ const MOCK_CHART_DATA: ChartData = {
  * MOCK: Returns rich 12-month demo data after a short delay.
  * REAL: Replace body with `return api.get('/datasets/${datasetId}/charts').then(res => res.data)`
  */
-export async function getVisualizationData(datasetId: string): Promise<ChartData> {
-    console.log(`Fetching chart data for dataset: ${datasetId}`)
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    // REAL CALL (uncomment when backend is ready):
-    // const { data } = await api.get(`/datasets/${datasetId}/charts`)
-    // return data
-
-    return MOCK_CHART_DATA
+export async function getVisualizationData(datasetId: string): Promise<ChartData | null> {
+    try {
+        const { data } = await api.get<ChartData>(`/datasets/${datasetId}/charts`)
+        return data
+    } catch {
+        // Endpoint not yet implemented on backend — return null so callers can handle gracefully
+        return null
+    }
 }
+
 
 // ── Agent 5 Visual Insights (Dynamic) ─────────────────
 

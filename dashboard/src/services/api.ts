@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const api = axios.create({
-    baseURL: 'https://cfo-backend-de7r.onrender.com',
+    baseURL: 'http://localhost:8000',
     headers: {
         'Content-Type': 'application/json',
     },
