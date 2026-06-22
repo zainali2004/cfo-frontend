@@ -58,24 +58,108 @@ function normalizeSeries(visual: VisualInsight): Array<{ key: string; label: str
         .map((k) => ({ key: k, label: k }))
 }
 
-function getNumericKeys(chartData: Record<string, unknown>[], xKey: string): string[] {
-    const first = chartData[0]
-    if (!first || typeof first !== 'object') return []
+// Coerce a value to a finite number, tolerating the string formats the LLM often
+// returns: "1,234", "$1.2M"-style symbols, "12%", whitespace, and accounting
+// negatives like "(500)". Returns null when the value is not numeric.
+function toNumber(value: unknown): number | null {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+    if (typeof value !== 'string') return null
 
-    return Object.keys(first).filter((k) => {
-        if (k === xKey) return false
-        return chartData.some((row) => typeof row[k] === 'number' && Number.isFinite(row[k] as number))
+    let s = value.trim()
+    if (s === '') return null
+
+    // Strip currency symbols, thousands separators, percent signs, and spaces
+    // first, so accounting negatives with a suffix (e.g. "(5)%") still parse.
+    s = s.replace(/[,%\s$€£¥]/g, '')
+
+    let sign = 1
+    if (/^\(.*\)$/.test(s)) {
+        sign = -1 // accounting negative, e.g. "(1,234)"
+        s = s.slice(1, -1)
+    }
+    if (s === '' || s === '-' || s === '.') return null
+
+    const n = Number(s)
+    return Number.isFinite(n) ? sign * n : null
+}
+
+// Build a render-ready copy of chart_data with value columns coerced to numbers,
+// and report which keys actually hold plottable numeric data.
+function prepareChartData(
+    rawData: Record<string, unknown>[],
+    xKey: string,
+    candidateKeys: string[],
+): { data: Record<string, unknown>[]; numericKeys: string[] } {
+    if (!rawData.length) return { data: [], numericKeys: [] }
+
+    // Candidate value keys = declared series keys ∪ every non-x key seen in the data.
+    const keySet = new Set<string>(candidateKeys.filter(Boolean))
+    rawData.forEach((row) => {
+        if (row && typeof row === 'object') {
+            Object.keys(row).forEach((k) => {
+                if (k !== xKey) keySet.add(k)
+            })
+        }
     })
+
+    const data = rawData.map((row) => {
+        const next: Record<string, unknown> = { ...row }
+        keySet.forEach((k) => {
+            const num = toNumber(row?.[k])
+            if (num !== null) next[k] = num
+        })
+        return next
+    })
+
+    const numericKeys = Array.from(keySet).filter((k) =>
+        data.some((row) => typeof row[k] === 'number' && Number.isFinite(row[k] as number)),
+    )
+
+    return { data, numericKeys }
+}
+
+function ChartEmptyState({ message }: { message: string }) {
+    return (
+        <div className="h-40 w-full flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-center px-4">
+            <AlertCircle className="h-5 w-5 text-gray-400" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
+        </div>
+    )
 }
 
 function VisualChart({ visual }: { visual: VisualInsight }) {
-    const chartData = (Array.isArray(visual.chart_data) ? visual.chart_data : []) as Record<string, unknown>[]
-    const xKey = visual.x_key || 'name'
-    const series = normalizeSeries(visual)
+    const rawData = (Array.isArray(visual.chart_data) ? visual.chart_data : []) as Record<string, unknown>[]
     const chartType = (visual.recharts_type || '').toLowerCase()
-    const numericKeys = getNumericKeys(chartData, xKey)
+    const declaredSeries = normalizeSeries(visual)
 
-    if (!chartData.length || !chartType) return null
+    // Resolve the x-axis key: use the declared one if it exists in the data,
+    // otherwise fall back to the first non-numeric column, then 'name'.
+    const firstRow = rawData.find((r) => r && typeof r === 'object') || null
+    const rowKeys = firstRow ? Object.keys(firstRow) : []
+    let xKey = visual.x_key || 'name'
+    if (firstRow && !(xKey in firstRow)) {
+        const nonNumeric = rowKeys.find((k) => toNumber(firstRow[k]) === null)
+        xKey = nonNumeric || rowKeys[0] || 'name'
+    }
+
+    const { data: chartData, numericKeys } = prepareChartData(
+        rawData,
+        xKey,
+        declaredSeries.map((s) => s.key),
+    )
+
+    // Keep only declared series whose key actually carries numeric data; if none
+    // survive, fall back to every detected numeric column so the chart isn't empty.
+    let series = declaredSeries.filter((s) => numericKeys.includes(s.key))
+    if (series.length === 0) {
+        series = numericKeys.map((k) => ({ key: k, label: k }))
+    }
+
+    if (!chartType) return null
+    if (!rawData.length) return <ChartEmptyState message="No data was generated for this chart." />
+    if (numericKeys.length === 0) {
+        return <ChartEmptyState message="This chart has no plottable numeric values." />
+    }
 
     if (chartType === 'pie') {
         const primary = series[0]?.key || 'value'
@@ -397,6 +481,15 @@ export function VisualPage() {
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
                                     <span className="font-semibold">Statement:</span> {visual.derived_signal}
                                 </p>
+                            )}
+
+                            {visual.key_driver && (
+                                <div className="flex items-start gap-2 rounded-lg border border-deloitte/30 bg-deloitte/5 dark:bg-deloitte/10 p-3">
+                                    <Sparkles className="h-4 w-4 text-deloitte mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-gray-800 dark:text-gray-200">
+                                        <span className="font-semibold text-deloitte">Key driver:</span> {visual.key_driver}
+                                    </p>
+                                </div>
                             )}
 
                             {visual.why_this_chart && (

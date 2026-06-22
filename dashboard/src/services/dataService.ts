@@ -401,6 +401,7 @@ export interface VisualInsight {
     chart_title?: string
     insight_text: string
     derived_signal?: string
+    key_driver?: string
     why_this_chart?: string
     chart_type?: string
     recharts_type?: RechartsType

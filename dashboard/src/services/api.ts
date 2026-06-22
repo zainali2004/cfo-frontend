@@ -2,7 +2,10 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const api = axios.create({
+    // Production backend (Render)
     baseURL: 'https://cfo-backend-de7r.onrender.com',
+    // Local backend (FastAPI / uvicorn default port) — uncomment for local dev:
+    // baseURL: 'http://localhost:8000',
     headers: {
         'Content-Type': 'application/json',
     },
